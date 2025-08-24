@@ -29,6 +29,10 @@ app.use('/api/payments', require('./routes/payments'));
 app.use('/api/checkin', require('./routes/checkin'));
 app.use('/api/zoom', require('./routes/zoom'));
 
+app.get('/', (req, res) => {
+  res.send('Backend is running!');
+});
+
 // Test route
 app.get('/api/test', (req, res) => {
   res.json({ message: 'API is working!' });
