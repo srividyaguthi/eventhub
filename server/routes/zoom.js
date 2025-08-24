@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 router.get('/test', (req, res) => {
-  res.json({ message: 'Payments API working' });
+  res.json({ message: 'Zoom API working' });
 });
 
 module.exports = router;
