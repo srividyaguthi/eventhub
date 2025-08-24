@@ -89,6 +89,14 @@ function App() {
                     </ProtectedRoute>
                   } 
                 />
+                <Route 
+                  path="/events" 
+                  element={
+                    <ProtectedRoute>
+                      <MyEvents />
+                    </ProtectedRoute>
+                  } 
+                />
               </Routes>
             </MainContent>
             <Footer />

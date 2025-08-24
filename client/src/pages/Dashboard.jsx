@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
-import axios from 'axios';
+import { mockEventsApi } from '../utils/mockData'; // Use mock data instead of API
 import { useAuth } from '../context/AuthContext';
 
 const DashboardContainer = styled.div`
@@ -140,27 +140,37 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        // In a real app, you'd have a dedicated dashboard endpoint
-        // For now, we'll fetch events and calculate stats
-        const response = await axios.get('/api/events');
-        const allEvents = response.data.data.events;
+        // Use mock data instead of API calls
+        const response = await mockEventsApi.getEvents();
         
-        // Filter events by organizer
-        const myEvents = allEvents.filter(event => 
-          event.organizer && event.organizer._id === user.id
-        );
+        // Handle different response structures safely
+        let allEvents = [];
         
-        // Calculate stats
+        if (response.data && response.data.events) {
+          allEvents = response.data.events;
+        } else if (Array.isArray(response)) {
+          allEvents = response;
+        } else if (response.events) {
+          allEvents = response.events;
+        } else {
+          allEvents = []; // Fallback to empty array
+        }
+        
+        // Filter events by organizer (for demo, show all events)
+        const myEvents = allEvents; // In a real app, you'd filter by organizer ID
+        
+        // Calculate stats with proper fallbacks
         const totalEvents = myEvents.length;
-        const totalAttendees = myEvents.reduce((sum, event) => sum + event.attendees.length, 0);
+        const totalAttendees = myEvents.reduce((sum, event) => sum + (event.attendees?.length || 0), 0);
         const totalRevenue = myEvents.reduce((sum, event) => {
-          return sum + event.ticketTypes.reduce((tSum, ticket) => tSum + (ticket.sold * ticket.price), 0);
+          return sum + (event.ticketTypes?.reduce((tSum, ticket) => 
+            tSum + ((ticket.sold || 0) * (ticket.price || 0)), 0) || 0);
         }, 0);
         
         setStats({
-          totalEvents,
-          totalAttendees,
-          totalRevenue
+          totalEvents: totalEvents || 0,
+          totalAttendees: totalAttendees || 0,
+          totalRevenue: totalRevenue || 0
         });
         
         // Get upcoming events (next 7 days)
@@ -184,6 +194,10 @@ const Dashboard = () => {
         setRecentEvents(recent);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        // Set default values instead of crashing
+        setStats({ totalEvents: 0, totalAttendees: 0, totalRevenue: 0 });
+        setUpcomingEvents([]);
+        setRecentEvents([]);
       } finally {
         setLoading(false);
       }
@@ -234,29 +248,36 @@ const Dashboard = () => {
 
         {upcomingEvents.length > 0 ? (
           <EventsGrid>
-            {upcomingEvents.map(event => (
-              <EventCard key={event._id}>
-                <EventImage image={event.image || 'https://via.placeholder.com/300x160?text=Event+Image'} />
-                <EventContent>
-                  <EventTitle>{event.title}</EventTitle>
-                  <EventMeta>
-                    <span>{new Date(event.date).toLocaleDateString()}</span>
-                    <span>{event.attendees.length} attendees</span>
-                  </EventMeta>
-                  <EventActions>
-                    <Link to={`/events/${event._id}`} className="btn btn-primary btn-sm">
-                      View
-                    </Link>
-                    <Link to={`/events/${event._id}/edit`} className="btn btn-secondary btn-sm">
-                      Edit
-                    </Link>
-                    <Link to={`/checkin/${event._id}`} className="btn btn-success btn-sm">
-                      Check-In
-                    </Link>
-                  </EventActions>
-                </EventContent>
-              </EventCard>
-            ))}
+            {upcomingEvents.map(event => {
+              const eventDate = new Date(event.date);
+              const isPast = eventDate < new Date();
+              
+              return (
+                <EventCard key={event._id}>
+                  <EventImage image={event.image || 'https://via.placeholder.com/300x160?text=Event+Image'} />
+                  <EventContent>
+                    <EventTitle>{event.title}</EventTitle>
+                    <EventMeta>
+                      <span>{eventDate.toLocaleDateString()}</span>
+                      <span>{event.attendees?.length || 0} attendees</span>
+                    </EventMeta>
+                    <EventActions>
+                      <Link to={`/events/${event._id}`} className="btn btn-primary btn-sm">
+                        View
+                      </Link>
+                      <Link to={`/events/${event._id}/edit`} className="btn btn-secondary btn-sm">
+                        Edit
+                      </Link>
+                      {!isPast && (
+                        <Link to={`/checkin/${event._id}`} className="btn btn-success btn-sm">
+                          Check-In
+                        </Link>
+                      )}
+                    </EventActions>
+                  </EventContent>
+                </EventCard>
+              );
+            })}
           </EventsGrid>
         ) : (
           <div className="text-center">
@@ -275,26 +296,31 @@ const Dashboard = () => {
 
         {recentEvents.length > 0 ? (
           <EventsGrid>
-            {recentEvents.map(event => (
-              <EventCard key={event._id}>
-                <EventImage image={event.image || 'https://via.placeholder.com/300x160?text=Event+Image'} />
-                <EventContent>
-                  <EventTitle>{event.title}</EventTitle>
-                  <EventMeta>
-                    <span>{new Date(event.date).toLocaleDateString()}</span>
-                    <span>{event.attendees.length} attendees</span>
-                  </EventMeta>
-                  <EventActions>
-                    <Link to={`/events/${event._id}`} className="btn btn-primary btn-sm">
-                      View
-                    </Link>
-                    <Link to={`/events/${event._id}/edit`} className="btn btn-secondary btn-sm">
-                      Edit
-                    </Link>
-                  </EventActions>
-                </EventContent>
-              </EventCard>
-            ))}
+            {recentEvents.map(event => {
+              const eventDate = new Date(event.date);
+              const isPast = eventDate < new Date();
+              
+              return (
+                <EventCard key={event._id}>
+                  <EventImage image={event.image || 'https://via.placeholder.com/300x160?text=Event+Image'} />
+                  <EventContent>
+                    <EventTitle>{event.title}</EventTitle>
+                    <EventMeta>
+                      <span>{eventDate.toLocaleDateString()}</span>
+                      <span>{event.attendees?.length || 0} attendees</span>
+                    </EventMeta>
+                    <EventActions>
+                      <Link to={`/events/${event._id}`} className="btn btn-primary btn-sm">
+                        View
+                      </Link>
+                      <Link to={`/events/${event._id}/edit`} className="btn btn-secondary btn-sm">
+                        Edit
+                      </Link>
+                    </EventActions>
+                  </EventContent>
+                </EventCard>
+              );
+            })}
           </EventsGrid>
         ) : (
           <p>No recently created events.</p>

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
-import api from '../utils/api';
+import mockApi from '../utils/mockApi';
 
 const AuthContext = createContext();
 
@@ -42,22 +42,20 @@ export const AuthProvider = ({ children }) => {
       
       if (token && user) {
         try {
-          // Set default auth header
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          
-          // Verify the token is still valid by making a simple API call
-          await api.get('/api/auth/me');
-          
+          const parsedUser = JSON.parse(user);
+
+          // Verify the token is still valid using mock API
+          const response = await mockApi.getCurrentUser(token);
+
           dispatch({
             type: 'LOGIN_SUCCESS',
-            payload: JSON.parse(user)
+            payload: response.data.user
           });
         } catch (error) {
-          console.error('Auth check failed:', error);
+          console.error('Auth check failed:', error.message);
           // Token is invalid, clear storage
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          delete api.defaults.headers.common['Authorization'];
           dispatch({ type: 'AUTH_CHECK_COMPLETE' });
         }
       } else {
@@ -66,21 +64,18 @@ export const AuthProvider = ({ children }) => {
     };
 
     checkAuthStatus();
-  }, []); // Empty dependency array to run only once
+  }, []);
 
   const login = async (email, password) => {
     dispatch({ type: 'LOGIN_START' });
     
     try {
-      const response = await api.post('/api/auth/login', { email, password });
-      const { token, data } = response.data;
+      const response = await mockApi.login(email, password);
+      const { token, data } = response;
       
       // Store token and user in localStorage
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      
-      // Set default auth header
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       dispatch({
         type: 'LOGIN_SUCCESS',
@@ -89,7 +84,7 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true };
     } catch (error) {
-      const message = error.response?.data?.message || 'Login failed';
+      const message = error.message || 'Login failed';
       dispatch({ type: 'LOGIN_FAILURE', payload: message });
       return { success: false, error: message };
     }
@@ -99,15 +94,12 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: 'LOGIN_START' });
     
     try {
-      const response = await api.post('/api/auth/register', { name, email, password, role });
-      const { token, data } = response.data;
+      const response = await mockApi.register(name, email, password, role);
+      const { token, data } = response;
       
       // Store token and user in localStorage
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      
-      // Set default auth header
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       dispatch({
         type: 'LOGIN_SUCCESS',
@@ -116,7 +108,7 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true };
     } catch (error) {
-      const message = error.response?.data?.message || 'Registration failed';
+      const message = error.message || 'Registration failed';
       dispatch({ type: 'LOGIN_FAILURE', payload: message });
       return { success: false, error: message };
     }
@@ -125,7 +117,6 @@ export const AuthProvider = ({ children }) => {
   const logout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    delete api.defaults.headers.common['Authorization'];
     dispatch({ type: 'LOGOUT' });
   }, []);
 

@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import styled from 'styled-components';
-import axios from 'axios';
+import { mockEventsApi } from '../utils/mockData';
 import { toast } from 'react-toastify';
+import { useAuth } from '../context/AuthContext';
 
 const FormContainer = styled.div`
   max-width: 800px;
@@ -80,6 +81,7 @@ const EventCreate = () => {
   const [ticketTypes, setTicketTypes] = useState([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
   const isVirtual = watch('isVirtual', false);
 
   const addTicketType = () => {
@@ -94,7 +96,9 @@ const EventCreate = () => {
 
   const updateTicketType = (index, field, value) => {
     const updated = [...ticketTypes];
-    updated[index][field] = value;
+    updated[index][field] = field === 'name' ? value : 
+                           field === 'price' ? parseFloat(value) || 0 : 
+                           parseInt(value) || 0;
     setTicketTypes(updated);
   };
 
@@ -104,20 +108,37 @@ const EventCreate = () => {
       return;
     }
 
+    // Validate ticket types
+    for (const ticket of ticketTypes) {
+      if (!ticket.name.trim()) {
+        toast.error('All ticket types must have a name');
+        return;
+      }
+      if (ticket.price < 0) {
+        toast.error('Ticket price cannot be negative');
+        return;
+      }
+      if (ticket.quantity < 1) {
+        toast.error('Ticket quantity must be at least 1');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const eventData = {
         ...data,
         ticketTypes,
-        date: new Date(data.date).toISOString()
+        date: new Date(data.date).toISOString(),
+        organizer: user.id
       };
 
-      const response = await axios.post('/api/events', eventData);
+      const response = await mockEventsApi.createEvent(eventData);
       toast.success('Event created successfully!');
-      navigate(`/events/${response.data.data.event._id}`);
+      navigate(`/events/${response.data.event._id}`);
     } catch (error) {
       console.error('Error creating event:', error);
-      toast.error(error.response?.data?.message || 'Failed to create event');
+      toast.error(error.message || 'Failed to create event');
     } finally {
       setLoading(false);
     }
@@ -198,9 +219,8 @@ const EventCreate = () => {
                 type="text"
                 className="form-control"
                 placeholder="Venue address"
-                {...register('location', { required: 'Location is required for physical events' })}
+                {...register('location')}
               />
-              {errors.location && <ErrorMessage>{errors.location.message}</ErrorMessage>}
             </div>
           )}
 
@@ -255,7 +275,7 @@ const EventCreate = () => {
                         type="number"
                         className="form-control"
                         value={ticket.price}
-                        onChange={(e) => updateTicketType(index, 'price', parseFloat(e.target.value))}
+                        onChange={(e) => updateTicketType(index, 'price', e.target.value)}
                         min="0"
                         step="0.01"
                         required
@@ -267,7 +287,7 @@ const EventCreate = () => {
                         type="number"
                         className="form-control"
                         value={ticket.quantity}
-                        onChange={(e) => updateTicketType(index, 'quantity', parseInt(e.target.value))}
+                        onChange={(e) => updateTicketType(index, 'quantity', e.target.value)}
                         min="1"
                         required
                       />

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import axios from 'axios';
+import {mockEventsApi} from '../utils/mockData';
 
 const HeroSection = styled.section`
   background: linear-gradient(135deg, ${props => props.theme.colors.primary} 0%, ${props => props.theme.colors.secondary} 100%);
@@ -139,36 +140,25 @@ const LoadingSpinner = styled.div`
 `;
 
 const Home = () => {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const response = await axios.get('/api/events');
-        
-        // Handle different response structures
-        let eventsData = [];
-        
-        if (response.data.data && response.data.data.events) {
-          eventsData = response.data.data.events;
-        } else if (Array.isArray(response.data)) {
-          eventsData = response.data;
-        } else if (response.data.events) {
-          eventsData = response.data.events;
-        }
-        
-        setEvents(eventsData.slice(0, 6));
-      } catch (error) {
-        console.error('Error fetching events:', error);
-        setEvents([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+    const [events, setEvents] = useState([]);
+    const [loading, setLoading] = useState(true);
   
-    fetchEvents();
-  }, []);
+    useEffect(() => {
+      const fetchEvents = async () => {
+        try {
+          const response = await mockEventsApi.getEvents();
+          const eventsData = response.data.events;
+          setEvents(eventsData.slice(0, 6));
+        } catch (error) {
+          console.error('Error fetching events:', error);
+          setEvents([]);
+        } finally {
+          setLoading(false);
+        }
+      };
+    
+      fetchEvents();
+    }, []);  
 
   return (
     <>

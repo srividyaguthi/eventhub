@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
-import axios from 'axios';
+import { mockEventsApi } from '../utils/mockData';
 import { useAuth } from '../context/AuthContext';
 
 const EventsContainer = styled.div`
@@ -53,7 +53,6 @@ const EventImage = styled.div`
   background-image: url(${props => props.image});
   background-size: cover;
   background-position: center;
-  background-color: ${props => props.theme.colors.light};
 `;
 
 const EventContent = styled.div`
@@ -126,133 +125,69 @@ const LoadingSpinner = styled.div`
   }
 `;
 
-const ErrorMessage = styled.div`
-  background: ${props => props.theme.colors.danger};
-  color: white;
-  padding: 1rem;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-  text-align: center;
-`;
-
-const EmptyState = styled.div`
-  text-align: center;
-  padding: 4rem 2rem;
-  color: ${props => props.theme.colors.gray};
-  
-  h3 {
-    margin-bottom: 1rem;
-    color: ${props => props.theme.colors.dark};
-  }
-  
-  p {
-    margin-bottom: 2rem;
-  }
-`;
-
 const MyEvents = () => {
   const [events, setEvents] = useState([]);
   const [filteredEvents, setFilteredEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchMyEvents = async () => {
-      if (!isAuthenticated) {
-        setLoading(false);
-        setError('Please log in to view your events');
-        return;
-      }
-
       try {
-        setLoading(true);
-        setError(null);
-        
-        // Try different possible endpoints and response structures
-        let response;
-        let eventsData = [];
-
-        try {
-          // Try user-specific events endpoint first
-          response = await axios.get(`/api/users/${user.id}/events`);
-        } catch (err) {
-          // Fallback to general events endpoint
-          response = await axios.get('/api/events');
-        }
-
-        // Handle different response structures
-        if (response.data) {
-          // Try different possible response structures
-          if (response.data.events) {
-            eventsData = response.data.events;
-          } else if (response.data.data && response.data.data.events) {
-            eventsData = response.data.data.events;
-          } else if (Array.isArray(response.data.data)) {
-            eventsData = response.data.data;
-          } else if (Array.isArray(response.data)) {
-            eventsData = response.data;
-          } else {
-            console.log('Response structure:', response.data);
-            eventsData = [];
-          }
-        }
-
-        // Filter events by current user if using general endpoint
-        if (user && user.id) {
-          eventsData = eventsData.filter(event => 
-            event.organizer === user.id || 
-            event.organizerId === user.id ||
-            event.createdBy === user.id
-          );
-        }
-
-        setEvents(eventsData);
-        setFilteredEvents(eventsData);
-        
+        // Hardcoded event data
+        const hardcodedEvents = [
+          {
+            _id: '1',
+            title: 'Tech Conference 2025',
+            description: 'A conference about the latest in tech.',
+            date: '2025-09-15',
+            image: 'https://via.placeholder.com/300x160?text=Tech+Conference',
+            ticketTypes: [
+              { quantity: 100, sold: 50, price: 20 },
+              { quantity: 50, sold: 30, price: 50 },
+            ],
+            attendees: [{ id: 'a1' }, { id: 'a2' }],
+          },
+          {
+            _id: '2',
+            title: 'Music Festival',
+            description: 'Enjoy live music performances.',
+            date: '2025-08-30',
+            image: 'https://via.placeholder.com/300x160?text=Music+Festival',
+            ticketTypes: [
+              { quantity: 200, sold: 150, price: 30 },
+            ],
+            attendees: [{ id: 'b1' }, { id: 'b2' }, { id: 'b3' }],
+          },
+          {
+            _id: '3',
+            title: 'Art Exhibition',
+            description: 'Explore modern art.',
+            date: '2025-07-20',
+            image: 'https://via.placeholder.com/300x160?text=Art+Exhibition',
+            ticketTypes: [
+              { quantity: 50, sold: 20, price: 15 },
+            ],
+            attendees: [],
+          },
+        ];
+  
+        // Simulate API response
+        setEvents(hardcodedEvents);
+        setFilteredEvents(hardcodedEvents);
       } catch (error) {
         console.error('Error fetching events:', error);
-        setError(error.response?.data?.message || 'Failed to fetch events');
-        
-        // For development, you can use mock data
-        if (process.env.NODE_ENV === 'development') {
-          const mockEvents = [
-            {
-              _id: '1',
-              title: 'Tech Conference 2024',
-              description: 'Annual technology conference',
-              date: '2024-12-01',
-              image: 'https://via.placeholder.com/300x160?text=Tech+Conference',
-              ticketTypes: [
-                { quantity: 100, sold: 75, price: 50 },
-                { quantity: 50, sold: 30, price: 100 }
-              ],
-              attendees: new Array(105).fill(null)
-            },
-            {
-              _id: '2',
-              title: 'Music Festival',
-              description: 'Summer music festival',
-              date: '2024-07-15',
-              image: 'https://via.placeholder.com/300x160?text=Music+Festival',
-              ticketTypes: [
-                { quantity: 500, sold: 450, price: 75 }
-              ],
-              attendees: new Array(450).fill(null)
-            }
-          ];
-          setEvents(mockEvents);
-          setFilteredEvents(mockEvents);
-        }
+        setEvents([]);
+        setFilteredEvents([]);
       } finally {
         setLoading(false);
       }
     };
-
+  
     fetchMyEvents();
-  }, [user, isAuthenticated]);
+  }, []);
 
   useEffect(() => {
     let filtered = events;
@@ -271,8 +206,8 @@ const MyEvents = () => {
     // Apply search filter
     if (searchQuery) {
       filtered = filtered.filter(event => 
-        event.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        event.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (event.description && event.description.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
     
@@ -287,20 +222,6 @@ const MyEvents = () => {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <EventsContainer>
-        <EmptyState>
-          <h3>Authentication Required</h3>
-          <p>Please log in to view your events.</p>
-          <Link to="/login" className="btn btn-primary">
-            Log In
-          </Link>
-        </EmptyState>
-      </EventsContainer>
-    );
-  }
-
   return (
     <EventsContainer>
       <PageHeader>
@@ -309,12 +230,6 @@ const MyEvents = () => {
           Create New Event
         </Link>
       </PageHeader>
-
-      {error && (
-        <ErrorMessage>
-          {error}
-        </ErrorMessage>
-      )}
 
       <Filters>
         <select 
@@ -337,24 +252,20 @@ const MyEvents = () => {
       {filteredEvents.length > 0 ? (
         <EventsGrid>
           {filteredEvents.map(event => {
-            // Safely calculate stats with fallback values
-            const ticketTypes = event.ticketTypes || [];
-            const attendees = event.attendees || [];
-            
-            const totalTickets = ticketTypes.reduce((sum, ticket) => sum + (ticket.quantity || 0), 0);
-            const soldTickets = ticketTypes.reduce((sum, ticket) => sum + (ticket.sold || 0), 0);
-            const revenue = ticketTypes.reduce((sum, ticket) => sum + ((ticket.sold || 0) * (ticket.price || 0)), 0);
-            
+            const totalTickets = event.ticketTypes ? 
+              event.ticketTypes.reduce((sum, ticket) => sum + (ticket.quantity || 0), 0) : 0;
+            const soldTickets = event.ticketTypes ? 
+              event.ticketTypes.reduce((sum, ticket) => sum + (ticket.sold || 0), 0) : 0;
+            const revenue = event.ticketTypes ? 
+              event.ticketTypes.reduce((sum, ticket) => sum + ((ticket.sold || 0) * (ticket.price || 0)), 0) : 0;
             const eventDate = new Date(event.date);
             const isPast = eventDate < new Date();
             
             return (
               <EventCard key={event._id}>
-                <EventImage 
-                  image={event.image || 'https://via.placeholder.com/300x160?text=Event+Image'} 
-                />
+                <EventImage image={event.image || 'https://via.placeholder.com/300x160?text=Event+Image'} />
                 <EventContent>
-                  <EventTitle>{event.title || 'Untitled Event'}</EventTitle>
+                  <EventTitle>{event.title}</EventTitle>
                   <EventMeta>
                     <span>{eventDate.toLocaleDateString()}</span>
                     <span className={isPast ? 'text-muted' : 'text-success'}>
@@ -365,7 +276,7 @@ const MyEvents = () => {
                   <EventStats>
                     <Stat>
                       <h4>Attendees</h4>
-                      <p>{attendees.length}</p>
+                      <p>{event.attendees ? event.attendees.length : 0}</p>
                     </Stat>
                     <Stat>
                       <h4>Tickets</h4>
@@ -396,18 +307,12 @@ const MyEvents = () => {
           })}
         </EventsGrid>
       ) : (
-        <EmptyState>
-          <h3>No Events Found</h3>
-          <p>
-            {searchQuery || statusFilter !== 'all' 
-              ? 'No events match your current filters.' 
-              : "You haven't created any events yet."
-            }
-          </p>
+        <div className="text-center">
+          <p>No events found.</p>
           <Link to="/events/create" className="btn btn-primary">
             Create Your First Event
           </Link>
-        </EmptyState>
+        </div>
       )}
     </EventsContainer>
   );

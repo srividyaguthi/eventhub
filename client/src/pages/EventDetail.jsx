@@ -187,12 +187,28 @@ const LoadingSpinner = styled.div`
   }
 `;
 
+const ErrorContainer = styled.div`
+  text-align: center;
+  padding: 2rem;
+  
+  h2 {
+    color: ${props => props.theme.colors.danger};
+    margin-bottom: 1rem;
+  }
+  
+  p {
+    color: ${props => props.theme.colors.gray};
+    margin-bottom: 1.5rem;
+  }
+`;
+
 const EventDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [registering, setRegistering] = useState(false);
   const [registrationData, setRegistrationData] = useState(null);
@@ -200,27 +216,73 @@ const EventDetail = () => {
   useEffect(() => {
     const fetchEvent = async () => {
       try {
+        setLoading(true);
+        setError(null);
+        
+        console.log(`Fetching event with ID: ${id}`);
         const response = await axios.get(`/api/events/${id}`);
-        setEvent(response.data.data.event);
+        
+        console.log('API Response:', response.data);
+        
+        // Handle different possible response structures
+        let eventData = null;
+        
+        if (response.data?.data?.event) {
+          // Structure: { data: { event: {...} } }
+          eventData = response.data.data.event;
+        } else if (response.data?.event) {
+          // Structure: { event: {...} }
+          eventData = response.data.event;
+        } else if (response.data?._id) {
+          // Structure: event object directly
+          eventData = response.data;
+        } else {
+          throw new Error('Invalid response structure');
+        }
+        
+        if (!eventData) {
+          throw new Error('Event data not found in response');
+        }
+        
+        setEvent(eventData);
         
         // Check if user is already registered
-        if (isAuthenticated && response.data.data.event.attendees) {
-          const userRegistration = response.data.data.event.attendees.find(
-            a => a.user && a.user._id === user.id
+        if (isAuthenticated && eventData.attendees && user?.id) {
+          const userRegistration = eventData.attendees.find(
+            a => a.user && (a.user._id === user.id || a.user.id === user.id)
           );
           if (userRegistration) {
             setRegistrationData(userRegistration);
           }
         }
+        
       } catch (error) {
         console.error('Error fetching event:', error);
-        toast.error('Failed to load event details');
+        console.error('Error response:', error.response?.data);
+        
+        let errorMessage = 'Failed to load event details';
+        
+        if (error.response?.status === 404) {
+          errorMessage = 'Event not found';
+        } else if (error.response?.status === 403) {
+          errorMessage = 'Access denied';
+        } else if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+        
+        setError(errorMessage);
+        toast.error(errorMessage);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchEvent();
+    if (id) {
+      fetchEvent();
+    } else {
+      setError('No event ID provided');
+      setLoading(false);
+    }
   }, [id, isAuthenticated, user]);
 
   const handleRegister = async () => {
@@ -242,11 +304,32 @@ const EventDetail = () => {
       });
 
       toast.success('Successfully registered for the event!');
-      setRegistrationData(response.data.data.registration);
+      
+      // Handle different response structures for registration
+      let registrationData = null;
+      if (response.data?.data?.registration) {
+        registrationData = response.data.data.registration;
+      } else if (response.data?.registration) {
+        registrationData = response.data.registration;
+      } else {
+        registrationData = response.data;
+      }
+      
+      setRegistrationData(registrationData);
       
       // Refresh event data
       const eventResponse = await axios.get(`/api/events/${id}`);
-      setEvent(eventResponse.data.data.event);
+      let eventData = null;
+      
+      if (eventResponse.data?.data?.event) {
+        eventData = eventResponse.data.data.event;
+      } else if (eventResponse.data?.event) {
+        eventData = eventResponse.data.event;
+      } else {
+        eventData = eventResponse.data;
+      }
+      
+      setEvent(eventData);
     } catch (error) {
       console.error('Error registering for event:', error);
       toast.error(error.response?.data?.message || 'Failed to register for event');
@@ -263,24 +346,25 @@ const EventDetail = () => {
     );
   }
 
-  if (!event) {
+  if (error || !event) {
     return (
       <EventContainer>
-        <div className="text-center">
-          <h2>Event not found</h2>
-          <p>The event you're looking for doesn't exist or has been removed.</p>
+        <ErrorContainer>
+          <h2>Oops! Something went wrong</h2>
+          <p>{error || 'The event you\'re looking for doesn\'t exist or has been removed.'}</p>
           <button 
             className="btn btn-primary"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/events')}
           >
-            Back to Home
+            Back to Events
           </button>
-        </div>
+        </ErrorContainer>
       </EventContainer>
     );
   }
 
-  const isOrganizer = isAuthenticated && user.id === event.organizer._id;
+  const isOrganizer = isAuthenticated && user?.id && event.organizer && 
+    (user.id === event.organizer._id || user.id === event.organizer.id);
   const isRegistered = registrationData !== null;
 
   return (
@@ -316,7 +400,7 @@ const EventDetail = () => {
           
           <p>{event.description}</p>
           
-          {!isOrganizer && !isRegistered && (
+          {!isOrganizer && !isRegistered && event.ticketTypes && event.ticketTypes.length > 0 && (
             <TicketSection>
               <h3>Register for this Event</h3>
               <TicketTypes>
@@ -328,9 +412,9 @@ const EventDetail = () => {
                   >
                     <div>
                       <strong>{ticket.name}</strong>
-                      <p>{ticket.sold} of {ticket.quantity} sold</p>
+                      <p>{ticket.sold || 0} of {ticket.quantity} sold</p>
                     </div>
-                    <div>${ticket.price.toFixed(2)}</div>
+                    <div>${(ticket.price || 0).toFixed(2)}</div>
                   </TicketType>
                 ))}
               </TicketTypes>
@@ -381,7 +465,7 @@ const EventDetail = () => {
       <EventContent>
         <EventDetails>
           <h2>Event Details</h2>
-          <div dangerouslySetInnerHTML={{ __html: event.description.replace(/\n/g, '<br/>') }} />
+          <div dangerouslySetInnerHTML={{ __html: (event.description || '').replace(/\n/g, '<br/>') }} />
           
           {event.agenda && event.agenda.length > 0 && (
             <div className="mt-4">
@@ -396,11 +480,13 @@ const EventDetail = () => {
         </EventDetails>
         
         <Sidebar>
-          <OrganizerCard>
-            <h3>Organizer</h3>
-            <p>{event.organizer.name}</p>
-            <p>{event.organizer.email}</p>
-          </OrganizerCard>
+          {event.organizer && (
+            <OrganizerCard>
+              <h3>Organizer</h3>
+              <p>{event.organizer.name}</p>
+              <p>{event.organizer.email}</p>
+            </OrganizerCard>
+          )}
           
           <QrCodeCard>
             <h3>Share this Event</h3>

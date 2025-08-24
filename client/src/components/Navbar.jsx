@@ -178,9 +178,9 @@ const Navbar = () => {
   };
 
   const toggleUserMenu = () => {
+    console.log('Toggling user menu:', !isUserMenuOpen);
     setIsUserMenuOpen(!isUserMenuOpen);
   };
-
   return (
     <Nav>
       <div className="container">
